@@ -2,6 +2,7 @@ package mika
 
 import (
 	"idcproxy/protocols"
+	transferkcp "idcproxy/protocols/transfer/kcp"
 	"net"
 )
 
@@ -57,13 +58,30 @@ func (c *Mika) Read(b []byte) (n int, err error) {
 }
 
 func DailWithRawAddrHTTP(network string, server string, rawAddr []byte) (protocols.Protocol, error) {
-	var conn net.Conn
-	var err error
-	conn, err = net.Dial(network, server)
-	if err != nil {
-		return nil, err
+	if network == "kcp" {
+		kcpconn, err := transferkcp.GetKcpSmuxSession("idcgz")
+		if err != nil {
+			return nil, err
+		}
+		smuxStream, err := kcpconn.OpenStream()
+		if err != nil {
+			return nil, err
+		}
+
+		header := newHeader(rawAddr)
+		return NewMika(smuxStream, header)
+	} else {
+		conn, err := net.Dial(network, server)
+		if err != nil {
+			return nil, err
+		}
+		header := newHeader(rawAddr)
+		return NewMika(conn, header)
 	}
 
-	header := newHeader(rawAddr)
-	return NewMika(conn, header)
+	// smuxConfig := smux.DefaultConfig()
+	// smuxConfig.MaxReceiveBuffer = 4194304
+	// smuxConfig.KeepAliveInterval = time.Duration(10) * time.Second
+	// session, _ := smux.Client(NewCompStream(conn), smuxConfig)
+	
 }

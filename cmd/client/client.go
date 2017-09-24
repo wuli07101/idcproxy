@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"idcproxy/protocols"
 	"idcproxy/protocols/proxy/http"
+	transferkcp "idcproxy/protocols/transfer/kcp"
 	"idcproxy/utils"
 	"net"
 )
@@ -68,6 +69,8 @@ func main() {
 	if len(servers) <= 0 {
 		utils.Fatalf("Please configure server")
 	}
+
+	go transferkcp.ResetIdcConn("idcgz",5)
 
 	for _, localConf := range conf.Local {
 		proxyServe(localConf)

@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	kcp "github.com/xtaci/kcp-go"
+	"github.com/xtaci/smux"
 	"idcproxy/protocols"
 	"idcproxy/protocols/mika"
 	"idcproxy/protocols/transfer/tcp"
@@ -39,47 +41,84 @@ func listen(serverInfo *utils.ServerConf) {
 
 		go func() {
 			tcpConn := &tcp.Conn{c, time.Duration(serverInfo.Timeout) * time.Second}
-			handle(tcpConn)
+			handle(mika.NewCompStream(tcpConn))
 		}()
 	}
 }
 
-// func listenKcp(serverInfo *utils.ServerConf) {
-// 	nl, err := kcp.ListenWithOptions(fmt.Sprintf("%s:%d", serverInfo.Address, serverInfo.Port), nil, 10, 3)
-// 	if err != nil {
-// 		utils.Fatalf("Create server error %s", err)
-// 	}
+func handleMux(conn protocols.Protocol) {
+	// stream multiplex
+	smuxConfig := smux.DefaultConfig()
+	smuxConfig.MaxReceiveBuffer = 4194304
+	smuxConfig.KeepAliveInterval = time.Duration(10) * time.Second
 
-// 	utils.Infof("Listen on kcp://%s:%d\n", serverInfo.Address, serverInfo.Port)
-// 	cg := mika.NewCryptoGenerator(serverInfo.Method, serverInfo.Password)
+	mux, err := smux.Server(conn, smuxConfig)
+	if err != nil {
+		conn.Close()
+		utils.Errorf("Create smux.Server error %s", err)
+	}
+	defer mux.Close()
+	for {
+		p1, err := mux.AcceptStream()
+		if err != nil {
+			utils.Errorf("mux.AcceptStream error %s", err)
+			return
+		}
+		go handle(p1)
+	}
+}
 
-// 	for {
-// 		conn, err := nl.AcceptKCP()
-// 		if err != nil {
-// 			utils.Errorf("Accept connection error %s", err)
-// 			continue
-// 		}
+func listenKcp(serverInfo *utils.ServerConf) {
+	nl, err := kcp.ListenWithOptions(fmt.Sprintf("%s:%d", serverInfo.Address, serverInfo.Port), nil, 10, 3)
+	if err != nil {
+		utils.Fatalf("Create server error %s", err)
+	}
+	if err := nl.SetDSCP(0); err != nil {
+		utils.Fatalf("SetDSCP error %s", err)
+	}
+	if err := nl.SetReadBuffer(4194304); err != nil {
+		utils.Fatalf("SetReadBuffer error %s", err)
+	}
+	if err := nl.SetWriteBuffer(4194304); err != nil {
+		utils.Fatalf("SetWriteBuffer error %s", err)
+	}
 
-// 		go func() {
-// 			conn.SetStreamMode(true)
-// 			conn.SetNoDelay(1, 20, 2, 1)
-// 			conn.SetACKNoDelay(true)
-// 			conn.SetWindowSize(1024, 1024)
-// 			kcpConn := &tcp.Conn{conn, time.Duration(serverInfo.Timeout) * time.Second}
-// 			handle(kcpConn, cg)
-// 		}()
-// 	}
-// }
+	utils.Infof("Listen on kcp://%s:%d\n", serverInfo.Address, serverInfo.Port)
+	for {
+		conn, err := nl.AcceptKCP()
+		if err != nil {
+			utils.Errorf("Accept connection error %s", err)
+			continue
+		}
+
+		go func() {
+			conn.SetStreamMode(true)
+			conn.SetNoDelay(1, 10, 2, 1)
+			conn.SetACKNoDelay(true)
+			conn.SetWindowSize(1024, 1024)
+			conn.SetWriteDelay(true)
+			conn.SetMtu(1350)
+
+			kcpConn := &tcp.Conn{conn, time.Duration(serverInfo.Timeout) * time.Second}
+			handleMux(utils.NewCompStream(kcpConn))
+		}()
+	}
+}
 
 func main() {
 	conf = utils.ParseSeverConf()
-
 	//TODO check conf
+
+	//注册服务
 	for _, serverInfo := range conf.Server {
 		if serverInfo.Timeout <= 0 {
 			serverInfo.Timeout = 30
 		}
 
-		listen(serverInfo)
+		if serverInfo.Protocol == "kcp" {
+			listenKcp(serverInfo)
+		} else {
+			listen(serverInfo)
+		}
 	}
 }
