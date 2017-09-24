@@ -1,28 +1,30 @@
 package kcp
 
 import (
-    "idcproxy/utils"
+	"errors"
 	cmap "github.com/streamrail/concurrent-map"
 	kcp "github.com/xtaci/kcp-go"
 	"github.com/xtaci/smux"
-    "time"
-    "errors"
+	"idcproxy/utils"
+	"math/rand"
+	"time"
 )
 
 var (
 	idcObjects = cmap.New()
 	smuxId     int
-    serverList map[string]string
+	serverList map[string]string
 )
 
 func init() {
-    serverList = make(map[string]string)
-    serverList["idcgz"] = "127.0.0.1:8388"
+	serverList = make(map[string]string)
+	serverList["idcgz"] = "43.255.106.154:8388"
 }
+
 type smuxObj struct {
-	session *smux.Session
-	ttl     time.Time
-    serverAddr  string
+	session    *smux.Session
+	ttl        time.Time
+	serverAddr string
 }
 
 type idcObject struct {
@@ -30,15 +32,10 @@ type idcObject struct {
 	muxes   []smuxObj
 }
 
-func gen_next_smux_id() int {
-	smuxId += 1
-	return smuxId
-}
-
 func ResetIdcConn(idcName string, conn int) {
-    removeIdcObject(idcName)
+	removeIdcObject(idcName)
 
-    server := serverList[idcName]
+	server := serverList[idcName]
 
 	numconn := uint16(conn)
 	muxes := make([]smuxObj, numconn)
@@ -46,12 +43,12 @@ func ResetIdcConn(idcName string, conn int) {
 	for k := range muxes {
 		muxes[k].session = waitKcpConn(server)
 		muxes[k].ttl = time.Now().Add(time.Duration(30) * time.Second)
-        muxes[k].serverAddr = server
+		muxes[k].serverAddr = server
 	}
 
 	obj := &idcObject{
-		idcName:  idcName,
-		muxes: muxes,
+		idcName: idcName,
+		muxes:   muxes,
 	}
 
 	addIdcObject(obj)
@@ -59,13 +56,13 @@ func ResetIdcConn(idcName string, conn int) {
 
 // wait until a connection is ready
 func waitKcpConn(server string) *smux.Session {
-    for {
-        if session, err := createKcpConn(server); err == nil {
-            return session
-        } else {
-            time.Sleep(time.Second)
-        }
-    }
+	for {
+		if session, err := createKcpConn(server); err == nil {
+			return session
+		} else {
+			time.Sleep(time.Second)
+		}
+	}
 }
 
 func createKcpConn(server string) (*smux.Session, error) {
@@ -124,17 +121,15 @@ func removeIdcObject(idcName string) {
 
 func GetKcpSmuxSession(idcName string) (*smux.Session, error) {
 	if idcObject, result := findIdcObject(idcName); result == true {
-		smuxId := gen_next_smux_id()
-		idx := uint16(smuxId) % uint16(5)
-
+		idx := rand.Intn(len(idcObject.muxes))
 		if idcObject.muxes[idx].session.IsClosed() || time.Now().After(idcObject.muxes[idx].ttl) {
 			idcObject.muxes[idx].session = waitKcpConn(idcObject.muxes[idx].serverAddr)
 			idcObject.muxes[idx].ttl = time.Now().Add(time.Duration(10) * time.Second)
 		}
-		return idcObject.muxes[idx].session,nil
+		return idcObject.muxes[idx].session, nil
 	}
-    
-    var err error = errors.New("idc not exist")
-    
-    return nil,err
+
+	var err error = errors.New("idc not exist")
+
+	return nil, err
 }

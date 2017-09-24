@@ -41,7 +41,7 @@ func listen(serverInfo *utils.ServerConf) {
 
 		go func() {
 			tcpConn := &tcp.Conn{c, time.Duration(serverInfo.Timeout) * time.Second}
-			handle(mika.NewCompStream(tcpConn))
+			handle(utils.NewCompStream(tcpConn))
 		}()
 	}
 }
