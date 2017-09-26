@@ -10,17 +10,13 @@ import (
 )
 
 type Relay struct {
-	conn     protocols.Protocol
-	ssServer string
-	protocol string
-	closed   bool
+	conn   protocols.Protocol
+	closed bool
 }
 
-func NewRelay(conn protocols.Protocol, protocol string, idcProxyServer string) *Relay {
+func NewRelay(conn protocols.Protocol) *Relay {
 	return &Relay{
-		conn:     conn,
-		protocol: protocol,
-		ssServer: idcProxyServer,
+		conn: conn,
 	}
 }
 
@@ -34,7 +30,8 @@ func (h *Relay) Serve() {
 		return
 	}
 
-	mikaConn, err := mika.DailWithRawAddrHTTP(h.protocol, h.ssServer, utils.ToAddr(req.URL.Host))
+	idcName := req.Header.Get("idcName")
+	mikaConn, err := mika.DailWithRawAddrHTTP(idcName, "kcp", utils.ToAddr(req.URL.Host))
 	if err != nil {
 		utils.Errorf("Close connection error %v\n", err)
 		return

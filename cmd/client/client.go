@@ -44,33 +44,27 @@ func handleSocks5(c protocols.Protocol) {
 }
 
 func handleHTTP(c protocols.Protocol) {
-	httpSever := http.NewRelay(c, servers[0].protocol, servers[0].address)
+	httpSever := http.NewRelay(c)
 	httpSever.Serve()
 }
 
-type server struct {
-	address  string
-	protocol string
-}
-
-var servers []*server
+var serverList map[string][]string
 
 func main() {
+	serverList = make(map[string][]string)
 
 	conf := utils.ParseSeverConf()
 	for _, s := range conf.Server {
-		se := &server{
-			address:  fmt.Sprintf("%s:%d", s.Address, s.Port),
-			protocol: s.Protocol,
-		}
-		servers = append(servers, se)
+		serverList[s.IdcName] = append(serverList[s.IdcName], fmt.Sprintf("%s:%d", s.Address, s.Port))
 	}
 
-	if len(servers) <= 0 {
+	if len(serverList) <= 0 {
 		utils.Fatalf("Please configure server")
 	}
 
-	go transferkcp.ResetIdcConn("idcgz",5)
+	for idcName, saddress := range serverList {
+		transferkcp.ResetIdcConn(idcName, saddress, 5)
+	}
 
 	for _, localConf := range conf.Local {
 		proxyServe(localConf)

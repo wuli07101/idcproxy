@@ -3,7 +3,7 @@ package mika
 import (
 	"idcproxy/protocols"
 	transferkcp "idcproxy/protocols/transfer/kcp"
-	"net"
+	// "net"
 )
 
 // Mika dails connection between mika server and mika client.
@@ -57,31 +57,25 @@ func (c *Mika) Read(b []byte) (n int, err error) {
 	return c.Conn.Read(b)
 }
 
-func DailWithRawAddrHTTP(network string, server string, rawAddr []byte) (protocols.Protocol, error) {
-	if network == "kcp" {
-		kcpconn, err := transferkcp.GetKcpSmuxSession("idcgz")
-		if err != nil {
-			return nil, err
-		}
-		smuxStream, err := kcpconn.OpenStream()
-		if err != nil {
-			return nil, err
-		}
-
-		header := newHeader(rawAddr)
-		return NewMika(smuxStream, header)
-	} else {
-		conn, err := net.Dial(network, server)
-		if err != nil {
-			return nil, err
-		}
-		header := newHeader(rawAddr)
-		return NewMika(conn, header)
+func DailWithRawAddrHTTP(idcName string, network string, rawAddr []byte) (protocols.Protocol, error) {
+	// if network == "kcp" {
+	kcpconn, err := transferkcp.GetKcpSmuxSession(idcName)
+	if err != nil {
+		return nil, err
+	}
+	smuxStream, err := kcpconn.OpenStream()
+	if err != nil {
+		return nil, err
 	}
 
-	// smuxConfig := smux.DefaultConfig()
-	// smuxConfig.MaxReceiveBuffer = 4194304
-	// smuxConfig.KeepAliveInterval = time.Duration(10) * time.Second
-	// session, _ := smux.Client(NewCompStream(conn), smuxConfig)
-	
+	header := newHeader(rawAddr)
+	return NewMika(smuxStream, header)
+	// } else {
+	// 	conn, err := net.Dial(network, server)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	header := newHeader(rawAddr)
+	// 	return NewMika(conn, header)
+	// }
 }

@@ -8,6 +8,7 @@ import (
 )
 
 type ServerConf struct {
+	IdcName  string `json:"idcname"`
 	Address  string `json:"address"`
 	Port     int    `json:"port"`
 	Timeout  int    `json:"timeout"`
@@ -17,16 +18,16 @@ type ServerConf struct {
 }
 
 type LocalConf struct {
-	AutoExpire   int    `json:"autoexpire"`
-	Address   	 string `json:"address"`
-	Port         int    `json:"port"`
-	Protocol     string `json:"protocol"`
+	AutoExpire int    `json:"autoexpire"`
+	Address    string `json:"address"`
+	Port       int    `json:"port"`
+	Protocol   string `json:"protocol"`
 }
 
 type Conf struct {
-	Server      []*ServerConf `json:"server"`
-	Local       []*LocalConf  `json:"local"`
-	Timeout     int64         `json:"timeout"`
+	Server  []*ServerConf `json:"server"`
+	Local   []*LocalConf  `json:"local"`
+	Timeout int64         `json:"timeout"`
 }
 
 func newConf() *Conf {
@@ -45,24 +46,21 @@ func ParseSeverConf() *Conf {
 
 	flag.StringVar(&confFile, "c", "", "path to config file")
 
+	flag.StringVar(&conf.Server[0].IdcName, "idc", "default", "idc name")
 	flag.StringVar(&conf.Server[0].Address, "s", "", "server address")
 	flag.IntVar(&conf.Server[0].Port, "p", 8388, "server port")
 	flag.StringVar(&conf.Server[0].Password, "k", "password", "password")
 	flag.StringVar(&conf.Server[0].Method, "m", "aes-256-cfb", "encryption method")
 	flag.StringVar(&conf.Server[0].Protocol, "sprot", "kcp", "Protocol")
 
-
-
 	flag.StringVar(&conf.Local[0].Address, "b", "127.0.0.1", "local binding address")
 	flag.IntVar(&conf.Local[0].Port, "l", 1080, "local port")
 	flag.StringVar(&conf.Local[0].Protocol, "lprot", "http", "Protocol")
 	flag.IntVar(&conf.Local[0].AutoExpire, "ae", 10, "AutoExpire")
 
-
 	flag.Int64Var(&conf.Timeout, "t", 300, "timeout in seconds")
 	flag.BoolVar(&help, "-help", false, "print usage")
-	
-	
+
 	flag.Parse()
 
 	if help {

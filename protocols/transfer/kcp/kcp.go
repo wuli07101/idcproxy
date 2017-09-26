@@ -7,19 +7,14 @@ import (
 	"github.com/xtaci/smux"
 	"idcproxy/utils"
 	"math/rand"
+	"sync"
 	"time"
 )
 
 var (
-	idcObjects = cmap.New()
-	smuxId     int
-	serverList map[string]string
+	idcObjects               = cmap.New()
+	lock       *sync.RWMutex = new(sync.RWMutex)
 )
-
-func init() {
-	serverList = make(map[string]string)
-	serverList["idcgz"] = "43.255.106.154:8388"
-}
 
 type smuxObj struct {
 	session    *smux.Session
@@ -32,19 +27,30 @@ type idcObject struct {
 	muxes   []smuxObj
 }
 
-func ResetIdcConn(idcName string, conn int) {
-	removeIdcObject(idcName)
+func ResetIdcConn(idcName string, server []string, conn int) (bool, error) {
+	lock.RLock()
+	defer lock.RUnlock()
 
-	server := serverList[idcName]
-
-	numconn := uint16(conn)
+	serverLen := len(server)
+	numconn := uint16(conn * serverLen)
 	muxes := make([]smuxObj, numconn)
 
-	for k := range muxes {
-		muxes[k].session = waitKcpConn(server)
-		muxes[k].ttl = time.Now().Add(time.Duration(30) * time.Second)
-		muxes[k].serverAddr = server
+	k := 0
+	for i := 0; i < serverLen; i++ {
+		for j := 0; j < conn; j++ {
+			muxes[k].session = waitKcpConn(server[i])
+			muxes[k].ttl = time.Now().Add(time.Duration(30) * time.Second)
+			muxes[k].serverAddr = server[i]
+
+			k++
+		}
 	}
+
+	// for k := range muxes {
+	// 	muxes[k].session = waitKcpConn(server)
+	// 	muxes[k].ttl = time.Now().Add(time.Duration(30) * time.Second)
+	// 	muxes[k].serverAddr = server
+	// }
 
 	obj := &idcObject{
 		idcName: idcName,
@@ -52,6 +58,8 @@ func ResetIdcConn(idcName string, conn int) {
 	}
 
 	addIdcObject(obj)
+
+	return true, nil
 }
 
 // wait until a connection is ready
