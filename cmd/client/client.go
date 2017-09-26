@@ -7,6 +7,7 @@ import (
 	transferkcp "idcproxy/protocols/transfer/kcp"
 	"idcproxy/utils"
 	"net"
+	"runtime"
 )
 
 func proxyServe(localConf *utils.LocalConf) {
@@ -51,6 +52,8 @@ func handleHTTP(c protocols.Protocol) {
 var serverList map[string][]string
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	serverList = make(map[string][]string)
 
 	conf := utils.ParseSeverConf()

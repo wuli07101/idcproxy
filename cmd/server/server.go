@@ -9,6 +9,7 @@ import (
 	"idcproxy/protocols/transfer/tcp"
 	"idcproxy/utils"
 	"net"
+	"runtime"
 	"time"
 )
 
@@ -106,6 +107,8 @@ func listenKcp(serverInfo *utils.ServerConf) {
 }
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	conf = utils.ParseSeverConf()
 	//TODO check conf
 
